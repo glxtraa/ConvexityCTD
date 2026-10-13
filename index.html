@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f5f7fa" />
+    <meta name="description" content="Treasury bond futures CTD and delivery option calculator." />
+    <title>CTD Lab | Treasury Bond Futures</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <script defer src="/app.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="CTD Lab home"><span class="brand-mark">C</span><span>CTD <b>LAB</b></span></a>
+      <nav class="top-links" aria-label="Resources">
+        <a href="/Convexity-Maven-Fat-Cat.pdf" target="_blank" rel="noopener">Research PDF <span>↗</span></a>
+        <a id="colab-link" href="https://colab.research.google.com/github/glxtraa/ConvexityCTD/blob/main/Treasury_Bond_Futures_CTD_Delivery_Option_Calculator.ipynb" target="_blank" rel="noopener">Open in Colab <span>↗</span></a>
+        <a href="https://www.cmegroup.com/trading/interest-rates/treasury-conversion-factors.html" target="_blank" rel="noopener">CME basket source <span>↗</span></a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="eyebrow"><span class="live-dot"></span> U.S. TREASURY FUTURES · QUALITY OPTION MODEL</div>
+        <div class="hero-row">
+          <div>
+            <h1>Delivery optionality,<br /><em>made visible.</em></h1>
+            <p class="lede">Track the cheapest-to-deliver bond, see where the basket can switch, and estimate the value of the short’s delivery choice.</p>
+          </div>
+          <div class="asof-card"><span class="small-label">MARKET DATA AS OF</span><strong id="market-asof">Loading…</strong><span id="basket-status" class="status-line">Loading CME basket…</span></div>
+        </div>
+        <div class="resource-strip"><span>Built from the Convexity Maven research</span><span class="strip-dot">·</span><span>59 current December 2026 deliverables</span><span class="strip-dot">·</span><span>Shared model with Colab</span></div>
+      </section>
+
+      <section class="workspace">
+        <aside class="controls-panel">
+          <div class="panel-heading"><div><span class="section-kicker">MODEL INPUTS</span><h2>Contract & rates</h2></div><span class="step">01</span></div>
+          <label>Delivery month<select id="delivery-month"><option value="2026-12" selected>December 2026 · ZB</option></select></label>
+          <div class="input-grid">
+            <label>Futures price <span class="unit">per 100 par</span><input id="futures-price" type="number" step="0.01" value="102.25" /></label>
+            <label>Discount rate <span class="unit">% continuous</span><input id="discount-rate" type="number" step="0.01" value="4.00" /></label>
+            <label>Level volatility <span class="unit">bp to delivery</span><input id="level-vol" type="number" step="1" value="45" /></label>
+            <label>Slope volatility <span class="unit">bp to delivery</span><input id="slope-vol" type="number" step="1" value="20" /></label>
+            <label>Level / slope corr. <span class="unit">−1 to +1</span><input id="correlation" type="number" step="0.05" min="-1" max="1" value="-0.20" /></label>
+            <label>Scenarios <span class="unit">Monte Carlo</span><select id="scenarios"><option>10000</option><option selected>30000</option><option>60000</option><option>100000</option></select></label>
+          </div>
+          <div class="quote-note"><span class="note-icon">i</span><div><b>Curve yields are proxies</b><p>Daily 10y/20y/30y Treasury yields are interpolated to each bond. Edit a bond yield in the basket table for CUSIP-level quotes.</p></div></div>
+          <button id="calculate" class="primary-button"><span>Calculate CTD & option value</span><span class="button-arrow">→</span></button>
+          <div id="calc-error" class="error-message" role="alert"></div>
+          <div class="control-footer"><span class="data-pulse"></span><span id="data-source">Fetching public curve & CME basket</span></div>
+        </aside>
+
+        <div class="results-panel">
+          <div class="results-heading"><div><span class="section-kicker">DELIVERY ANALYSIS</span><h2>Model snapshot</h2></div><span id="model-tag" class="model-tag">QUALITY OPTION · V1</span></div>
+          <div class="metrics-grid">
+            <article class="metric-card featured"><span class="metric-label">CURRENT CTD</span><strong id="metric-ctd">—</strong><span id="metric-ctd-detail">Loading basket</span></article>
+            <article class="metric-card"><span class="metric-label">QUALITY OPTION PV</span><strong id="metric-option">—</strong><span>per $100 par · model estimate</span></article>
+            <article class="metric-card"><span class="metric-label">CTD SWITCH CHANCE</span><strong id="metric-switch">—</strong><span>current CTD not cheapest at delivery</span></article>
+            <article class="metric-card"><span class="metric-label">CTD DIVERSITY</span><strong id="metric-diversity">—</strong><span>simulated delivery candidates</span></article>
+          </div>
+          <div class="charts-grid">
+            <article class="chart-card wide"><div class="chart-heading"><div><span class="section-kicker">HISTORICAL CURVE</span><h3>Treasury yields</h3></div><span class="chart-caption">Daily · public data</span></div><div id="yield-chart" class="chart"></div></article>
+            <article class="chart-card"><div class="chart-heading"><div><span class="section-kicker">DELIVERY MONTH</span><h3>CTD switch map</h3></div><span class="chart-caption">Scenario probability</span></div><div id="ctd-chart" class="chart"></div></article>
+            <article class="chart-card"><div class="chart-heading"><div><span class="section-kicker">OPTION DISTRIBUTION</span><h3>Delivery payoff</h3></div><span class="chart-caption">Per $100 par</span></div><div id="payoff-chart" class="chart"></div></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="basket-section">
+        <div class="basket-heading"><div><span class="section-kicker">OFFICIAL DELIVERABLE BASKET</span><h2>Bond-by-bond basis</h2><p>Conversion factors refresh from CME. Yields begin with the latest Treasury par curve; edit any yield cell to use your own bond quote.</p></div><button id="download-csv" class="secondary-button">Export basket CSV <span>↓</span></button></div>
+        <div class="table-wrap"><table><thead><tr><th>CUSIP</th><th>Coupon</th><th>Maturity</th><th>Conversion factor</th><th>Yield (%)</th><th>Yield source</th><th>Dirty price</th><th>Adj. delivery cost</th><th>Net basis (bp)</th></tr></thead><tbody id="basket-rows"><tr><td colspan="9" class="loading-row">Loading official basket and market curve…</td></tr></tbody></table></div>
+        <div class="table-footer"><span id="bond-count">— bonds</span><span>Price convention: semiannual coupons · per $100 par</span></div>
+      </section>
+
+      <section class="method-note"><div class="method-mark">ƒ</div><div><span class="section-kicker">MODEL NOTE</span><p>Quality-option estimate only. This simple two-factor Gaussian yield model omits wild-card, timing, end-of-month, repo specialness, carry, and delivery constraints. Realized volatility is a proxy for sensitivity, not an implied-vol quote. The web app and Colab call the same Python calculation engine.</p></div><a href="https://www.cmegroup.com/articles/2024/calculating-us-treasury-futures-conversion-factors.html" target="_blank" rel="noopener">Method & source ↗</a></section>
+    </main>
+
+    <footer><span>CTD LAB <span class="footer-dot">·</span> Research calculator</span><span>For research and education. Not investment advice.</span><a href="/Treasury_Bond_Futures_CTD_Delivery_Option_Calculator.ipynb" download>Download notebook</a></footer>
+  </body>
+</html>
