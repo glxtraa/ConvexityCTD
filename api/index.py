@@ -1,11 +1,12 @@
 import csv
 import json
+import mimetypes
 import re
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler
 from io import BytesIO
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse, urljoin
+from urllib.parse import parse_qs, unquote, urlparse, urljoin
 from urllib.request import Request, urlopen
 
 from openpyxl import load_workbook
@@ -94,6 +95,17 @@ def _load_market():
 
 
 class handler(BaseHTTPRequestHandler):
+    STATIC_FILES = {
+        "/": "index.html",
+        "/index.html": "index.html",
+        "/styles.css": "styles.css",
+        "/app.js": "app.js",
+        "/Convexity-Maven-Fat-Cat.pdf": "Convexity-Maven-Fat-Cat.pdf",
+        "/Treasury_Bond_Futures_CTD_Delivery_Option_Calculator.ipynb": "Treasury_Bond_Futures_CTD_Delivery_Option_Calculator.ipynb",
+        "/CUSIP_Yield_Quotes_Template.csv": "CUSIP_Yield_Quotes_Template.csv",
+        "/Treasury_Bond_Futures_ZB_Dec2026_Basket_2026-10-08.csv": "Treasury_Bond_Futures_ZB_Dec2026_Basket_2026-10-08.csv",
+    }
+
     def _send(self, status, value, cache="no-store"):
         body = json.dumps(value, allow_nan=False).encode("utf-8")
         self.send_response(status)
@@ -104,6 +116,39 @@ class handler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
         self.wfile.write(body)
+
+    def _serve_static(self):
+        path = unquote(urlparse(self.path).path)
+        filename = self.STATIC_FILES.get(path)
+        if filename is None:
+            return self._send(404, {"error": "Not found"})
+        file_path = ROOT / filename
+        try:
+            body = file_path.read_bytes()
+        except FileNotFoundError:
+            return self._send(404, {"error": "Not found"})
+        self.send_response(200)
+        self.send_header("Content-Type", mimetypes.guess_type(filename)[0] or "application/octet-stream")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "public, max-age=3600")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_HEAD(self):
+        path = unquote(urlparse(self.path).path)
+        filename = self.STATIC_FILES.get(path)
+        if filename is None:
+            return self._send(404, {"error": "Not found"})
+        file_path = ROOT / filename
+        try:
+            size = file_path.stat().st_size
+        except FileNotFoundError:
+            return self._send(404, {"error": "Not found"})
+        self.send_response(200)
+        self.send_header("Content-Type", mimetypes.guess_type(filename)[0] or "application/octet-stream")
+        self.send_header("Content-Length", str(size))
+        self.send_header("Cache-Control", "public, max-age=3600")
+        self.end_headers()
 
     def do_OPTIONS(self):
         self._send(204, {})
@@ -117,6 +162,8 @@ class handler(BaseHTTPRequestHandler):
                 return self._send(200, _load_basket(month), "s-maxage=3600, stale-while-revalidate=86400")
             if route == "market":
                 return self._send(200, _load_market(), "s-maxage=1800, stale-while-revalidate=3600")
+            if not urlparse(self.path).path.startswith("/api/"):
+                return self._serve_static()
             return self._send(404, {"error":"Unknown API route"})
         except Exception as exc:
             return self._send(502, {"error":str(exc)})
