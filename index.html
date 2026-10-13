@@ -70,6 +70,15 @@
         </div>
       </section>
 
+      <section class="scenario-section">
+        <div class="scenario-heading"><div><span class="section-kicker">PARALLEL RATE STRESS</span><h2>What would make the CTD change?</h2><p>Each bond is repriced after the same yield move. A line crossing zero means that issue ties today’s CTD on conversion-adjusted dirty cost. Positive shocks mean higher yields.</p></div><span class="scenario-range">−200 to +200 bp</span></div>
+        <div class="scenario-grid">
+          <article class="chart-card scenario-chart-card"><div class="chart-heading"><div><span class="section-kicker">COST GAP VS CURRENT CTD</span><h3>Parallel-shift break-even map</h3></div><span class="chart-caption">Per $100 par</span></div><div id="scenario-chart" class="chart"></div></article>
+          <article class="scenario-table-card"><div class="chart-heading"><div><span class="section-kicker">NEAREST SWITCH THRESHOLDS</span><h3>Rate move to tie</h3></div><span class="chart-caption">Static yield shock</span></div><div class="table-wrap"><table><thead><tr><th>Alternative bond</th><th>Cost gap now</th><th>Parallel move to tie</th></tr></thead><tbody id="switch-threshold-rows"><tr><td colspan="3" class="loading-row">Calculating scenarios…</td></tr></tbody></table></div></article>
+        </div>
+        <p class="scenario-footnote">This is a deterministic, same-date parallel-shift sensitivity. It isolates relative cash-bond repricing and does not forecast the yield path, financing, carry, or delivery timing. The Monte Carlo switch probability above covers a separate two-factor level/slope scenario at delivery.</p>
+      </section>
+
       <section class="basket-section">
         <div class="basket-heading"><div><span class="section-kicker">OFFICIAL DELIVERABLE BASKET</span><h2>Bond-by-bond basis</h2><p>Conversion factors refresh from CME. Yields begin with the latest Treasury par curve; edit any yield cell to use your own bond quote.</p></div><button id="download-csv" class="secondary-button">Export basket CSV <span>↓</span></button></div>
         <div class="table-wrap"><table><thead><tr><th>CUSIP</th><th>Coupon</th><th>Maturity</th><th>Conversion factor</th><th>Yield (%)</th><th>Yield source</th><th>Dirty price</th><th>Adj. delivery cost</th><th>Net basis (bp)</th></tr></thead><tbody id="basket-rows"><tr><td colspan="9" class="loading-row">Loading official basket and market curve…</td></tr></tbody></table></div>

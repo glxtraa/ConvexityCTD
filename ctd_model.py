@@ -117,12 +117,67 @@ def calculate(payload: dict[str, Any]) -> dict[str, Any]:
 
     prepared.sort(key=lambda r: r["adjusted_delivery_cost"])
     current_ctd = prepared[0]
+    # Deterministic parallel-shift analysis at valuation: apply the same yield
+    # shock to every bond, reprice each issue, and find the nearest level where
+    # another issue's conversion-adjusted cost crosses today's CTD.
+    scenario_shocks = np.arange(-200.0, 201.0, 10.0)
+    threshold_shocks = np.arange(-500.0, 501.0, 1.0)
+    all_shocks = np.unique(np.concatenate([scenario_shocks, threshold_shocks]))
+    scenario_costs = np.empty((len(all_shocks), len(prepared)), dtype=float)
+    for i, bond in enumerate(prepared):
+        shifted_yields = bond["yield_pct"] + all_shocks / 100.0
+        scenario_costs[:, i] = _dirty_price_vector(
+            bond["coupon_pct"], bond["maturity"], valuation_date, shifted_yields
+        ) / bond["conversion_factor"]
+    shock_index = {float(shock): i for i, shock in enumerate(all_shocks)}
+    scenario_rows = []
+    for shock in scenario_shocks:
+        row = scenario_costs[shock_index[float(shock)]]
+        scenario_rows.append({
+            "parallel_shock_bp": float(shock),
+            "ctd_cusip": prepared[int(np.argmin(row))]["cusip"],
+            "ctd_adjusted_cost": float(np.min(row)),
+        })
+    ref_index = next(i for i, r in enumerate(prepared) if r["cusip"] == current_ctd["cusip"])
+    thresholds = []
+    current_cost_curve = scenario_costs[:, ref_index]
+    for i, bond in enumerate(prepared):
+        if i == ref_index:
+            continue
+        gap = scenario_costs[:, i] - current_cost_curve
+        crossing = np.flatnonzero(gap[:-1] * gap[1:] <= 0.0)
+        roots = []
+        for j in crossing:
+            x0, x1 = all_shocks[j], all_shocks[j + 1]
+            y0, y1 = gap[j], gap[j + 1]
+            root = x0 if y1 == y0 else x0 - y0 * (x1 - x0) / (y1 - y0)
+            roots.append(float(root))
+        thresholds.append({
+            "cusip": bond["cusip"],
+            "current_cost_gap": float(bond["adjusted_delivery_cost"] - current_ctd["adjusted_delivery_cost"]),
+            "break_even_parallel_bp": min(roots, key=abs) if roots else None,
+        })
+    thresholds.sort(key=lambda r: (abs(r["break_even_parallel_bp"]) if r["break_even_parallel_bp"] is not None else float("inf"), r["current_cost_gap"]))
+    switch_curves = []
+    curve_indices = [ref_index] + [
+        next(i for i, r in enumerate(prepared) if r["cusip"] == row["cusip"])
+        for row in sorted(prepared, key=lambda r: r["adjusted_delivery_cost"])
+        if row["cusip"] != current_ctd["cusip"]
+    ][:7]
+    for i in curve_indices:
+        switch_curves.append({
+            "cusip": prepared[i]["cusip"],
+            "is_current_ctd": i == ref_index,
+            "points": [
+                {"parallel_shock_bp": float(shock),
+                 "cost_gap": float(scenario_costs[shock_index[float(shock)], i] - scenario_costs[shock_index[float(shock)], ref_index])}
+                for shock in scenario_shocks
+            ],
+        })
     delivery_years = np.array([(_as_date(r["maturity"]) - delivery_date).days / 365.25 for r in prepared])
     base_yields = np.array([r["yield_pct"] for r in prepared], dtype=float)
     cfs = np.array([r["conversion_factor"] for r in prepared], dtype=float)
     coupons = np.array([r["coupon_pct"] for r in prepared], dtype=float)
-    ref_index = next(i for i, r in enumerate(prepared) if r["cusip"] == current_ctd["cusip"])
-
     rng = np.random.default_rng(seed)
     z = rng.multivariate_normal([[0.0, 0.0]][0], [[1.0, correlation], [correlation, 1.0]], size=n_scenarios)
     level = z[:, 0] * level_vol_bp / 10000.0
@@ -149,6 +204,9 @@ def calculate(payload: dict[str, Any]) -> dict[str, Any]:
         "current_ctd": current_ctd["cusip"],
         "current_ctd_adjusted_dirty_cost": current_ctd["adjusted_delivery_cost"],
         "current_rows": prepared,
+        "parallel_shock_scenarios": scenario_rows,
+        "ctd_switch_thresholds": thresholds,
+        "ctd_switch_curves": switch_curves,
         "summary": {
             "horizon_years": horizon,
             "reference_cusip": current_ctd["cusip"],

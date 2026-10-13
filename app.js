@@ -155,6 +155,7 @@ function renderResults() {
   $("metric-option").textContent = `$${number(summary.option_pv_per_100_par, 4)}`;
   $("metric-switch").textContent = pct(summary.probability_current_ctd_is_not_cheapest);
   $("metric-diversity").textContent = result.ctd_probabilities.filter((p) => p.probability > 0.005).length;
+  renderScenarioAnalysis(result);
   const candidates = result.ctd_probabilities.filter((p) => p.probability > 0).sort((a, b) => b.probability - a.probability);
   Plotly.newPlot("ctd-chart", [{
     type: "bar", x: candidates.map((p) => p.cusip), y: candidates.map((p) => 100 * p.probability),
@@ -173,6 +174,31 @@ function renderResults() {
     font: { family: "DM Sans, sans-serif", color: "#718196", size: 9 }, xaxis: { title: { text: "$ / 100 par", font: { size: 9 } }, gridcolor: "#edf1f4", tickfont: { size: 8 } },
     yaxis: { title: { text: "Scenarios", font: { size: 9 } }, gridcolor: "#edf1f4", tickfont: { size: 8 } } },
   { responsive: true, displaylogo: false });
+}
+
+function renderScenarioAnalysis(result) {
+  const colors = ["#2c9b80", "#367ca5", "#ce7843", "#7d69a5", "#4e9ca0", "#bd6372", "#87964b", "#7a8b9e"];
+  const curves = result.ctd_switch_curves || [];
+  const traces = curves.map((curve, index) => ({
+    type: "scatter", mode: "lines", name: curve.cusip + (curve.is_current_ctd ? " · current CTD" : ""),
+    x: curve.points.map((point) => point.parallel_shock_bp),
+    y: curve.points.map((point) => point.cost_gap),
+    line: { color: colors[index % colors.length], width: curve.is_current_ctd ? 3 : 1.8 },
+    hovertemplate: curve.cusip + "<br>Shock %{x:+.0f} bp<br>Cost gap $%{y:.4f}<extra></extra>",
+  }));
+  Plotly.newPlot("scenario-chart", traces, {
+    margin: { l: 52, r: 12, t: 8, b: 42 }, paper_bgcolor: "transparent", plot_bgcolor: "transparent",
+    font: { family: "DM Sans, sans-serif", color: "#718196", size: 9 }, hovermode: "x unified",
+    xaxis: { title: { text: "Parallel yield shock (bp)", font: { size: 9 } }, gridcolor: "#edf1f4", zeroline: true, zerolinecolor: "#c6d0d9" },
+    yaxis: { title: { text: "Adjusted cost gap ($ / 100 par)", font: { size: 9 } }, gridcolor: "#edf1f4", zeroline: true, zerolinecolor: "#657b8d" },
+    legend: { orientation: "h", y: -0.28, x: 0, font: { size: 8 } },
+  }, { responsive: true, displaylogo: false });
+  const thresholds = (result.ctd_switch_thresholds || []).slice(0, 12);
+  $("switch-threshold-rows").innerHTML = thresholds.map((row) => {
+    const threshold = row.break_even_parallel_bp;
+    const displayThreshold = threshold == null ? "No tie within ±500 bp" : (threshold > 0 ? "+" : "") + number(threshold, 1) + " bp";
+    return "<tr><td>" + row.cusip + "</td><td>" + number(row.current_cost_gap, 4) + "</td><td>" + displayThreshold + "</td></tr>";
+  }).join("") || '<tr><td colspan="3" class="loading-row">No alternative bonds</td></tr>';
 }
 
 function downloadBasket() {
