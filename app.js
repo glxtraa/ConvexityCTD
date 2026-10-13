@@ -31,7 +31,7 @@ function realizedHorizonVol(points, field, endDate, deliveryDate) {
 
 async function loadData() {
   const [basketResponse, marketResponse] = await Promise.all([
-    fetch(`/api/basket?month=${encodeURIComponent($("delivery-month").value)}`),
+    fetch(`/api/basket/${encodeURIComponent($("delivery-month").value)}`),
     fetch("/api/market"),
   ]);
   if (!basketResponse.ok) throw new Error((await basketResponse.json()).error || "Unable to load CME basket");

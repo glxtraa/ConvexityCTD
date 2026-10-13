@@ -1,6 +1,6 @@
 # CTD Lab
 
-Deployable Vercel version of the Treasury Bond Futures CTD and quality delivery-option calculator. The browser application and Colab notebook call the same Python calculation engine in `ctd_model.py`, so price, CTD, and Monte Carlo option calculations stay in sync.
+Deployable Vercel version of the Treasury Bond Futures CTD and quality delivery-option calculator. The web API uses `ctd_model.py`; Colab embeds the same calculation-engine source and runs it locally. This keeps bond pricing, CTD ranking, and Monte Carlo option rules aligned while letting the notebook work on its own.
 
 ## Links
 
@@ -10,7 +10,7 @@ Deployable Vercel version of the Treasury Bond Futures CTD and quality delivery-
 
 ## Vercel
 
-This repository is configured for Vercel static hosting and Python Functions. The UI lives in `index.html`, `styles.css`, and `app.js`; API routes under `api/` serve the CME basket, public Treasury history, and the shared calculation engine. The first deployment can be created from the repository root with the Vercel CLI or by importing this Git repository in Vercel.
+This repository is configured for Vercel static hosting and a Python Function. The UI lives in `index.html`, `styles.css`, and `app.js`; API routes under `api/` serve the CME basket, public Treasury history, and calculations. The Colab notebook independently refreshes CME and Treasury data and includes a local copy of the calculation engine.
 
 ## Market-data conventions
 
